@@ -60,7 +60,7 @@ class MakeBarcode{
     //センター右側パリティパターン
     protected $right_pattern = array(
         "1110010",
-        "1101100",
+        "1100110",
         "1101100",
         "1000010",
         "1011100",
@@ -89,7 +89,6 @@ class MakeBarcode{
     {
         $this->font_file = $font_file;
     }
-
 
     /**
      * jpg出力
@@ -302,9 +301,10 @@ class MakeBarcode{
         }
     }
 }
-
+/*
 $object = new MakeBarcode();
 $object->set_size(2);
 $object->set_font("/usr/share/fonts/japanese/TrueType/sazanami-mincho.ttf");
 $object->image_png( 4902471063378 );
 $object->image_jpeg( 4902471063378 );
+*/
