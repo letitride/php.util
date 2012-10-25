@@ -54,14 +54,14 @@ class ProcessHandler
      */
     public function set_break_process( $value )
     {
-        $this->_break_process = $break;
+        $this->_break_process = $value;
     }
     /**
      * 最大同時実行数セット
      */
     public function set_max_process( $value )
     {
-        $this->_max_process = $max;
+        $this->_max_process = $value;
     }
     /**
      * タイムアウトセット
@@ -102,18 +102,13 @@ class ProcessHandler
     public function run()
     {
 
-        if( $this->_executes == "" )
+        if( $this->_break_process <= 0 )
         {
-            return false;
+            $this->set_break_process( count( $this->_executes ) );
         }
-
-        if( $this->_break_process == 0 )
+        if( $this->_max_process <= 0 )
         {
-            $this->_break_process = count( $this->_executes );
-        }
-        if( $this->_max_process == 0 )
-        {
-            $this->_max_process = count( $this->_executes );
+            $this->set_max_process( count( $this->_executes ) );
         }
 
         $this->_init_log();
@@ -121,46 +116,36 @@ class ProcessHandler
         foreach( $this->_executes as $idx => $func )
         {
 
-            if( $this->_break_process != 0 && $idx >= $this->_break_process )
+            //依頼処理回数到達
+            if( $idx >= $this->_break_process )
             {
                 break;
             }
 
-            $args = $this->_args[$idx];
+            //fork
             $pid = pcntl_fork();
+
             //fork失敗
             if( $pid == -1 ){ return false; }
 
             //子プロセスハンドラ
             if( $pid == 0 )
             {
-                //timeout設定
-                pcntl_alarm( $this->_timeout );
-                $mypid = getmypid();
-                //処理実施
-                $ret = call_user_func_array( $func, $args );
-                $time = microtime(true) - $this->_start_time;
-                $this->_log( "child {$mypid}: ". $time );
+                $args = $this->_args[$idx];
+
+                $this->_child_process( $func, $args );
                 exit();
             }
 
             //親ハンドラ
-
-            //pid フック
-            $this->_fork_process[$pid] = true;
+            $this->_parent_process( $pid );
             $pids[ $idx ] = $pid;
-
-            //最大プロセス起動時はjob完了するまで待機
-            if( $this->_max_process <= count($this->_fork_process) )
-            {
-                unset( $this->_fork_process[ pcntl_waitpid( -1, $status, WUNTRACED ) ] );
-            }
         }
 
-
+        //taskをフラッシュ
         while( 0 < count($this->_fork_process) )
         {
-            unset( $this->_fork_process[ pcntl_waitpid( -1, $status, WUNTRACED ) ] );
+            $this->_delay();
         }
 
         $time = microtime(true) - $this->_start_time;
@@ -168,6 +153,44 @@ class ProcessHandler
         return $pids;
 
     }
+
+    /**
+     * 何れかのプロセスが終了するまで待機
+     */
+    protected function _delay()
+    {
+        unset( $this->_fork_process[ pcntl_waitpid( -1, $status, WUNTRACED ) ] );
+    }
+
+    
+    /**
+     * 子プロセス処理
+     */
+    protected function _child_process( $func, $args )
+    {
+        //timeout設定
+        pcntl_alarm( $this->_timeout );
+        $mypid = getmypid();
+        //処理実施
+        call_user_func_array( $func, $args );
+        $time = microtime(true) - $this->_start_time;
+        $this->_log( "child {$mypid}: ". $time );
+    }
+
+    /**
+     * 親プロセス処理
+     */
+    protected function _parent_process( $pid )
+    {
+             //pid フック
+            $this->_fork_process[$pid] = true;
+            //最大プロセス起動時はjob完了するまで待機
+            if( $this->_max_process <= count($this->_fork_process) )
+            {
+                $this->_delay();
+            }
+    }
+
 
     //ログ記録
     protected function _log( $msg )
@@ -196,7 +219,6 @@ class ProcessHandler
 
 /**
  * usage
-*/
 
 class Hoge{
 
@@ -237,3 +259,4 @@ $ph->set_log_mode( ProcessHandler::LOG_NO_OUTPUT );
 $pids = $ph->run();
 
 print "end of process";
+*/
