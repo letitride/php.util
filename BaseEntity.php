@@ -1,5 +1,58 @@
 <?php
-require 'psql.php';
+//require 'psql.php';
+class psql{
+
+    protected $_db;
+    protected $_resource;
+
+    function __construct()
+    {
+        $arg_list = func_get_args();
+        $dsn = join( "\x20", $arg_list );
+        $this->_db = pg_connect( $dsn );
+    }
+
+
+    public function get_record( $sql, &$row_count, &$rows, $cond = array() )
+    {
+
+        $ret = $this->query( $sql, $cond );
+        if( $ret == false )
+        {
+            return false;
+        }
+
+        $row_count = pg_num_rows( $this->_resource );
+        $rows = array();
+        if( $row_count == 0 )
+        {
+            return true;
+        }
+        while( $record = $this->fetch() )
+        {
+            $rows[] = $record;
+        }
+        return true;
+    }
+
+    protected function query( $sql, $cond = array() )
+    {
+        $this->_resource = pg_query_params( $this->_db, $sql, $cond );
+        if( $this->_resource == false )
+        {
+            //$error = pg_last_error( $this->_db );
+            return false;
+        }
+        return true;
+    }
+
+    public function fetch()
+    {
+        return pg_fetch_object( $this->_resource );
+    }
+
+}
+
 class BaseEntity{
 
     protected $_db;
@@ -14,22 +67,36 @@ class BaseEntity{
     protected $_row_count = 0;
     protected $_rows = array();
 
+    const DELETE_COLUMN = "flg_delete";
+
     function __construct()
     {
-        /** sample */
-        $this->_db = new pgsql( "db dsn"  );
-        $this->_db->connect();
+        /** sample connect */
+        $this->_db = new psql( "host=localhost", "port=5432", "dbname=im5", "user=im0", "password=gps123" );
         $tbl = get_class( $this );
         $this->_table = $tbl;
         $this->_table_alias = $tbl;
         self::set_disable_record();
     }
 
-    public function get( $column, $idx = 0 ){
-        return $this->_rows[$idx][$column];    
+    public function get( $column, $idx = 0 )
+    {
+        if( isset($this->_rows[$idx]->{$column}) == false ){
+            return false;
+        }
+        return $this->_rows[$idx]->{$column};    
     }
 
-    public function set_join( $join_table, $option = "inner" ){
+    public function get_record( $idx )
+    {
+        if( isset($this->_rows[$idx]) == false ){
+            return false;
+        }
+        return $this->_rows[$idx];
+    }
+
+    public function set_join( $join_table, $option = "inner" )
+    {
         //todo
     }
 
@@ -53,7 +120,7 @@ class BaseEntity{
 
     public function set_select( $column, $tbl_alias = null, $column_alias = null )
     {
-        if( tbl_alias != null )
+        if( $tbl_alias != null )
         {
             $column = $tbl_alias . $column;
         }
@@ -64,7 +131,7 @@ class BaseEntity{
         $this->_select[] = $column;
     }
 
-    public function add_where( $column, $value = 0, $right_operator = "=", $left_operator = "and" )
+    public function add_where( $column, $right_operator = "=", $value = 0, $left_operator = "and" )
     {
         $this->_where[] = array( $left_operator, $column, $right_operator );
         $this->_cond[] = $value;
@@ -78,11 +145,11 @@ class BaseEntity{
     }
 
 
-
     protected function set_disable_record()
     {
-        self::add_where( "flg_delete" );
+        self::add_where( self::DELETE_COLUMN );
     }
+
 
     protected function make_select_query()
     {
@@ -105,17 +172,18 @@ class BaseEntity{
 }
 
 /** usage */
-class Bookmark extends BaseEntity{
+class Account extends BaseEntity{
 
 }
 
-$obj = new Bookmark();
-$obj->add_where( "id", 1, ">="  );
-$obj->set_order( "id desc", "created" );
-$obj->set_option( "limit 100" );
-$obj->set_option( "offset 0" );
-$obj->to_entity();
-echo " url:".$obj->get("url");
-echo "\n comment:".$obj->get("comment");
-echo "\n";
+$account = new Account();
+$account->set_select( "account_id" );
+$account->set_select( "account_name" );
+$account->add_where( "account_id", "=", 1 );
+$account->set_order( "account_id desc", "created" );
+$account->set_option( "limit 100" );
+$account->set_option( "offset 0" );
+$account->to_entity();
+var_dump( $account->get( "account_name", 1 ) );
+var_dump( $account->get_record( 0 ) );
 /**/
