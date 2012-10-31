@@ -72,7 +72,7 @@ class BaseEntity{
     function __construct()
     {
         /** sample connect */
-        $this->_db = new psql( "host=localhost", "port=5432", "dbname=im5", "user=im0", "password=gps123" );
+        $this->_db = new psql( "host=localhost", "port=5432", "dbname=*", "user=*", "password=*" );
         $tbl = get_class( $this );
         $this->_table = $tbl;
         $this->_table_alias = $tbl;
